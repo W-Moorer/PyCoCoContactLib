@@ -122,6 +122,17 @@ print("总接触力:", result.total_force)
 print("最大穿透深度:", result.max_penetration)
 ```
 
+适配层用法：
+```python
+from PyCoCoContactLib.api.adapter import ContactAdapter
+from PyCoCoContactLib.io.obj_loader import load_obj
+
+A = load_obj("models/ballMesh.obj")
+B = load_obj("models/ballMesh.obj")
+adapter = ContactAdapter.from_meshes(A, B)
+res = adapter.step((0.0, 0.0, 0.26), (1.0, 0.0, 0.0, 0.0), (0.0, 0.0, -0.26), (1.0, 0.0, 0.0, 0.0))
+```
+
 自定义模型：
 ```python
 from PyCoCoContactLib.force.models import HertzModel
@@ -138,10 +149,21 @@ from PyCoCoContactLib.visualization.pyvista_backend import visualize_contact
 visualize_contact(mesh_a, mesh_b, result.contact_points, result.pressures, result.total_force)
 ```
 
-位姿应用：
+位姿应用与复用BVH：
 ```python
 from PyCoCoContactLib.utils.transforms import apply_pose_to_mesh
-mesh_a_world = apply_pose_to_mesh(mesh_a, origin=(0,0,0.1), quat_wxyz=(1,0,0,0))
+from PyCoCoContactLib.core.bvh import MedianSplitBVHBuilder, find_candidates_with_pose
+
+# 刚体位姿下复用BVH进行粗检测
+A = load_obj("models/ballMesh.obj")
+B = load_obj("models/ballMesh.obj")
+builder = MedianSplitBVHBuilder()
+bvhA = builder.build(A)
+bvhB = builder.build(B)
+originA, quatA = (0.0,0.0,0.26), (1,0,0,0)
+originB, quatB = (0.0,0.0,-0.26), (1,0,0,0)
+candidates = find_candidates_with_pose(A, bvhA.nodes, bvhA.root, originA, quatA,
+                                       B, bvhB.nodes, bvhB.root, originB, quatB, skin=0.0)
 ```
 
 ## 开发环境要求

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import numpy as np
 from typing import List, Tuple
 from .mesh import Mesh
+from ..utils.transforms import quat_wxyz_to_rotmat
 
 
 @dataclass
@@ -109,3 +110,41 @@ class BVHBuilder:
 
 class MedianSplitBVHBuilder(BVHBuilder):
     pass
+
+
+def _update_leaf(node: BVHNode, mesh: Mesh, R: np.ndarray, p: np.ndarray):
+    j = node.tri_idx
+    i0, i1, i2 = mesh.F[j, 0], mesh.F[j, 1], mesh.F[j, 2]
+    a = mesh.V[i0] @ R.T + p
+    b = mesh.V[i1] @ R.T + p
+    c = mesh.V[i2] @ R.T + p
+    lo = np.minimum(np.minimum(a, b), c)
+    hi = np.maximum(np.maximum(a, b), c)
+    node.lo = lo
+    node.hi = hi
+
+
+def update_bvh_aabb_with_pose(nodes: List[BVHNode], root: int, mesh: Mesh, origin, quat_wxyz):
+    R = quat_wxyz_to_rotmat(quat_wxyz)
+    p = np.asarray(origin, dtype=float).reshape(3)
+    for n in nodes:
+        if n.tri_idx >= 0:
+            _update_leaf(n, mesh, R, p)
+    def post(i: int):
+        n = nodes[i]
+        if n.tri_idx >= 0:
+            return n.lo, n.hi
+        loL, hiL = post(n.left)
+        loR, hiR = post(n.right)
+        n.lo = np.minimum(loL, loR)
+        n.hi = np.maximum(hiL, hiR)
+        return n.lo, n.hi
+    post(root)
+
+
+def find_candidates_with_pose(meshA: Mesh, bvhA_nodes: List[BVHNode], bvhA_root: int, originA, quatA,
+                              meshB: Mesh, bvhB_nodes: List[BVHNode], bvhB_root: int, originB, quatB,
+                              skin: float = 0.0) -> List[Tuple[int, int]]:
+    update_bvh_aabb_with_pose(bvhA_nodes, bvhA_root, meshA, originA, quatA)
+    update_bvh_aabb_with_pose(bvhB_nodes, bvhB_root, meshB, originB, quatB)
+    return traverse_bvhs(bvhA_nodes, meshA, bvhA_root, bvhB_nodes, meshB, bvhB_root, skin=skin)

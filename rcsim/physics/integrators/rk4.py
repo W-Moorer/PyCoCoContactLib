@@ -10,15 +10,21 @@ def step_sub(world: ContactWorld, dt: float) -> None:
     v0 = np.stack([rb.body.velocity.copy() for rb in world.bodies], axis=0)
 
     def set_state(X: np.ndarray, V: np.ndarray) -> None:
-        world.set_state_arrays(X, V)
+        for i, rb in enumerate(world.bodies):
+            b = rb.body
+            if b.is_static:
+                continue
+            b.position = X[i].copy()
+            b.velocity = V[i].copy()
 
     def compute_a(X: np.ndarray, V: np.ndarray) -> np.ndarray:
         set_state(X, V)
-        F = world.compute_forces_array()
-        Xc, Vc, M, S = world.get_state_arrays()
-        a = np.zeros_like(V)
-        mask = (~S) & (M > 0.0)
-        a[mask] = F[mask] / M[mask][:, None]
+        F = world.compute_forces()
+        masses = np.array([rb.body.mass for rb in world.bodies], dtype=float).reshape(n)
+        static_mask = np.array([rb.body.is_static for rb in world.bodies], dtype=bool).reshape(n)
+        inv_m = np.zeros(n, dtype=float)
+        inv_m[(~static_mask) & (masses > 0.0)] = 1.0 / masses[(~static_mask) & (masses > 0.0)]
+        a = F * inv_m[:, None]
         return a
 
     k1x = v0

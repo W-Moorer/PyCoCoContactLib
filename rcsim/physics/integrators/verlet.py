@@ -6,19 +6,37 @@ from rcsim.physics.world import ContactWorld
 
 def step_sub(world: ContactWorld, dt: float) -> None:
     n = len(world.bodies)
-    X0, V0, M, S = world.get_state_arrays()
-    F0 = world.compute_forces_array()
-    a0 = np.zeros_like(V0)
-    mask = (~S) & (M > 0.0)
-    a0[mask] = F0[mask] / M[mask][:, None]
-    Vh = V0 + 0.5 * dt * a0
-    X1 = X0 + dt * Vh
-    world.set_state_arrays(X1, Vh)
-    F1 = world.compute_forces_array()
-    a1 = np.zeros_like(V0)
-    a1[mask] = F1[mask] / M[mask][:, None]
-    V1 = Vh + 0.5 * dt * a1
-    world.set_state_arrays(X1, V1)
+    x0 = np.stack([rb.body.position.copy() for rb in world.bodies], axis=0)
+    v0 = np.stack([rb.body.velocity.copy() for rb in world.bodies], axis=0)
+    masses = np.array([rb.body.mass for rb in world.bodies], dtype=float).reshape(n)
+    static_mask = np.array([rb.body.is_static for rb in world.bodies], dtype=bool).reshape(n)
+
+    F0 = world.compute_forces()
+    inv_m = np.zeros(n, dtype=float)
+    inv_m[(~static_mask) & (masses > 0.0)] = 1.0 / masses[(~static_mask) & (masses > 0.0)]
+    a0 = F0 * inv_m[:, None]
+
+    v_half = v0.copy()
+    v_half[~static_mask] = v0[~static_mask] + 0.5 * dt * a0[~static_mask]
+    x1 = x0.copy()
+    x1[~static_mask] = x0[~static_mask] + dt * v_half[~static_mask]
+
+    for i, rb in enumerate(world.bodies):
+        b = rb.body
+        if b.is_static:
+            continue
+        b.velocity = v_half[i]
+        b.position = x1[i]
+
+    F1 = world.compute_forces()
+    a1 = F1 * inv_m[:, None]
+
+    for i, rb in enumerate(world.bodies):
+        b = rb.body
+        if b.is_static:
+            continue
+        v1 = b.velocity + 0.5 * dt * a1[i]
+        b.velocity = v1
 
 
 def simulate(

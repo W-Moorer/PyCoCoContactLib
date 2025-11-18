@@ -41,8 +41,11 @@ PyCoCoContactLib/
 ├── demos/
 │   └── demo_drop.py              # 自由落体接触演示（CSV/日志/绘图）
 ├── models/
-│   ├── ballMesh.obj              # 示例网格（球）
-│   └── ballMesh/                 # 运行后生成的结果目录
+│   └── ballMesh.obj              # 示例网格（球）
+├── outputs/                      # 运行后生成的结果目录（统一在仓库根下）
+│   └── <name>_<mesh>_<时间>/     # CSV/日志/绘图与 perf_metrics.csv
+├── post/
+│   └── plot_perf_pie.py          # 性能占比饼图后处理脚本
 ├── rcsim/
 │   ├── contact/                  # 接触几何与检测
 │   │   ├── aabb_bvh.py           # AABB/BVH 加速结构
@@ -56,6 +59,7 @@ PyCoCoContactLib/
 │   │   └── integrators/
 │   │       └── verlet.py         # Velocity‑Verlet 与多子步仿真
 │   └── io/
+│       ├── perf.py               # 轻量性能记录器（CSV 输出 perf_metrics.csv）
 │       ├── recorders.py          # CSV 记录器示例
 │       └── __init__.py           # 导出 csv_recorder
 ├── LICENSE
@@ -84,7 +88,9 @@ python -m demos.demo_drop --mesh models/ballMesh.obj --time 8.0 --dt 0.01 --sub 
 python -m demos.demo_drop --mesh models/ballMesh.obj --time 8.0 --dt 0.01 --sub 0.0005 --damp 100.0 --half_wave --out mesh_drop_results_damped_half_wave.csv --log rcsim_output_damped_half_wave.log --progress 1.0 --verbose --video --fps 120 --stride 1 
 ```
 
-运行成功后，会在与 `ballMesh.obj` 同目录下新建 `models/ballMesh/` 子目录，内含 CSV、日志与绘图。替换网格时，将 `--mesh` 指向你的 OBJ 文件路径。
+运行成功后，所有结果统一写入仓库根下的 `outputs/` 目录，路径格式：
+`outputs/<name>_<meshStem>_<YYYYMMDD_HHMMSS>/`，其中 `<name>` 可通过 `--name` 参数自定义（默认 `output`）。目录中包含 CSV、日志、绘图 PNG 与 `perf_metrics.csv`。
+替换网格时，将 `--mesh` 指向你的 OBJ 文件路径。
 
 生成图像（仅从 CSV 绘制掉落物体曲线）：
 ```
@@ -127,6 +133,33 @@ def on_frame(frame, t, w):
 
 simulate_verlet(world, t_end=2.0, dt_frame=0.01, dt_sub=1e-3, on_frame=on_frame)
 ```
+
+## 结果输出与性能统计
+- 输出目录：所有运行结果统一保存到仓库根目录 `outputs/` 下，目录命名为 `outputs/<name>_<meshStem>_<YYYYMMDD_HHMMSS>/`。
+  - 通过参数 `--name` 自定义 `<name>` 前缀，默认 `output`。
+  - 目录内包含：`<out>.csv`、日志 `<log>.log`、各类绘图 PNG 与 `perf_metrics.csv`（性能摘要）。
+- 性能记录：内置轻量记录器会统计关键模块总耗时、次数与占比并写出 `perf_metrics.csv`，字段包括 `key,total_sec,count,avg_ms,percent,algorithm,t_end,dt_frame,dt_sub,bodies`。
+
+### 性能占比饼图（后处理）
+- 脚本位置：`post/plot_perf_pie.py`
+- 用法示例：
+  - 处理 `outputs/` 下的文件并指定输出路径：
+    ```
+    python post/plot_perf_pie.py --perf ".\outputs\output_ballMesh_YYYYMMDD_HHMMSS\perf_metrics.csv" --out ".\outputs\perf_pie.png"
+    ```
+  - 处理任意现有文件（例如旧示例目录），使用默认输出到同目录：
+    ```
+    python post/plot_perf_pie.py --perf ".\models\ballMesh\viz_20251118_231655\perf_metrics.csv"
+    ```
+- 绘图说明：
+  - 标题采用 `perf_metrics.csv` 所在文件夹名；字体使用 `Times New Roman`。
+  - 饼图内部仅显示较大扇区的百分比；右侧图例列出模块名、百分比与耗时。
+
+## 框架更新摘要
+- 统一输出位置：由 `models/<mesh>/...` 改为仓库根 `outputs/`，路径格式 `outputs/<name>_<meshStem>_<时间>/`。
+- 新参数：`demos/demo_drop.py` 支持 `--name` 自定义输出目录前缀（默认 `output`）。
+- 性能统计：新增 `rcsim/io/perf.py`，在积分器、世界与检测器关键路径埋点，自动写出 `perf_metrics.csv`。
+- 后处理：新增 `post/plot_perf_pie.py`，生成性能占比饼图，支持自定义输出路径或默认写入源目录。
 
 ## 许可协议
 本项目采用 MIT 许可，详见 `LICENSE`。

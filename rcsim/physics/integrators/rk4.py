@@ -2,6 +2,7 @@ import numpy as np
 from typing import Callable, Optional
 
 from rcsim.physics.world import ContactWorld
+from rcsim.io.perf import perf
 
 
 def step_sub(world: ContactWorld, dt: float) -> None:
@@ -67,14 +68,21 @@ def simulate(
     t = 0.0
     frame = 0
     while t < t_end - 1e-12:
+        try:
+            perf.set_meta(algorithm="rk4", t_end=t_end, dt_frame=dt_frame, dt_sub=dt_sub, bodies=len(world.bodies))
+        except Exception:
+            pass
         remaining = dt_frame
         while remaining > 1e-12:
             dt = min(dt_sub, remaining)
-            step_sub(world, dt)
+            with perf.section("integrator.step_sub"):
+                step_sub(world, dt)
             remaining -= dt
             t += dt
             if on_substep is not None:
-                on_substep(t, world)
+                with perf.section("callback.on_substep"):
+                    on_substep(t, world)
         if on_frame is not None:
-            on_frame(frame, t, world)
+            with perf.section("callback.on_frame"):
+                on_frame(frame, t, world)
         frame += 1

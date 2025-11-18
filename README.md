@@ -76,30 +76,12 @@ pip install numpy matplotlib
 
 - 无阻尼（对应原始 undamped 演示）：
 ```
-python -m demos.demo_drop \
-  --mesh models/ballMesh.obj \
-  --time 8.0 \
-  --dt 1e-2 \
-  --sub 1e-3 \
-  --out mesh_drop_results_rapid_verlet.csv \
-  --log rapid_output_verlet.log \
-  --progress 0.01 \
-  --verbose
+python -m demos.demo_drop --mesh models/ballMesh.obj --time 8.0 --dt 0.01 --sub 0.001 --out mesh_drop_results_rk4.csv --log rcsim_output_rk4.log --progress 0.01 --verbose --integrator rk4 --video --fps 120 --stride 1
 ```
 
 - 阻尼/半波阻尼（对应原始 damped 演示）：
 ```
-python -m demos.demo_drop \
-  --mesh models/ballMesh.obj \
-  --time 8.0 \
-  --dt 0.01 \
-  --sub 5e-4 \
-  --damp 100.0 \
-  --half_wave \
-  --out mesh_drop_results_rapid_verlet_damped.csv \
-  --log rapid_output_verlet_damped.log \
-  --progress 1.0 \
-  --verbose
+python -m demos.demo_drop --mesh models/ballMesh.obj --time 8.0 --dt 0.01 --sub 0.0005 --damp 100.0 --half_wave --out mesh_drop_results_damped_half_wave.csv --log rcsim_output_damped_half_wave.log --progress 1.0 --verbose --video --fps 120 --stride 1 
 ```
 
 运行成功后，会在与 `ballMesh.obj` 同目录下新建 `models/ballMesh/` 子目录，内含 CSV、日志与绘图。替换网格时，将 `--mesh` 指向你的 OBJ 文件路径。

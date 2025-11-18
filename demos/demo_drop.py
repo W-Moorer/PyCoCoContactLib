@@ -8,6 +8,7 @@ import numpy as np
 import re
 
 from rcsim import RapidMesh, RigidMeshBody, ContactWorld, simulate_verlet, simulate_rk4
+from rcsim.io.perf import perf
 try:
     import matplotlib.pyplot as plt
 except Exception:
@@ -126,6 +127,11 @@ def run_case(mesh: str, t_end: float, dt_frame: float, dt_sub: float, damp: floa
     f.write(f"energy_rel_error=0.000000e+00\n")
     f.flush()
     f.close()
+    try:
+        perf_path = os.path.join(os.path.dirname(csv_path), 'perf_metrics.csv')
+        perf.write_csv(perf_path)
+    except Exception:
+        pass
 
 
 def plot_results(csv_path: str, log_path: str, out_dir: str) -> None:

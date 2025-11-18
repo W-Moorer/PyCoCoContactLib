@@ -6,14 +6,14 @@ import math
 import numpy as np
 import re
 
-from rcsim import RapidMesh, RigidMeshBody, ContactWorld, simulate_verlet
+from rcsim import RapidMesh, RigidMeshBody, ContactWorld, simulate_verlet, simulate_rk4
 try:
     import matplotlib.pyplot as plt
 except Exception:
     plt = None
 
 
-def run_case(mesh: str, t_end: float, dt_frame: float, dt_sub: float, damp: float, log_path: str, csv_path: str, progress: float | None, verbose: bool, half_wave: bool):
+def run_case(mesh: str, t_end: float, dt_frame: float, dt_sub: float, damp: float, log_path: str, csv_path: str, progress: float | None, verbose: bool, half_wave: bool, integrator: str = "verlet"):
     meshA = RapidMesh.from_obj(mesh)
     meshB = RapidMesh.from_obj(mesh)
     A = RigidMeshBody(meshA, 1.0, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], is_static=True)
@@ -94,7 +94,10 @@ def run_case(mesh: str, t_end: float, dt_frame: float, dt_sub: float, damp: floa
             if progress is not None:
                 next_prog += float(progress)
 
-    simulate_verlet(world, t_end=t_end, dt_frame=dt_frame, dt_sub=dt_sub, on_frame=on_frame, on_substep=on_sub)
+    if integrator.lower() == "rk4":
+        simulate_rk4(world, t_end=t_end, dt_frame=dt_frame, dt_sub=dt_sub, on_frame=on_frame, on_substep=on_sub)
+    else:
+        simulate_verlet(world, t_end=t_end, dt_frame=dt_frame, dt_sub=dt_sub, on_frame=on_frame, on_substep=on_sub)
 
     with open(csv_path, 'w', newline='') as wf:
         w = csv.writer(wf)
@@ -176,6 +179,7 @@ def main():
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--damp', type=float, default=0.0)
     parser.add_argument('--half_wave', action='store_true')
+    parser.add_argument('--integrator', type=str, choices=['verlet', 'rk4'], default='verlet')
     parser.add_argument('--plot', action='store_true')
     args = parser.parse_args()
 
@@ -198,6 +202,7 @@ def main():
         progress=args.progress,
         verbose=args.verbose,
         half_wave=args.half_wave,
+        integrator=args.integrator,
     )
     if args.plot:
         plot_results(csv_path, log_path, out_dir)

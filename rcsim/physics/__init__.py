@@ -1,5 +1,5 @@
 from .rigid_bodies import RigidBody, RigidMeshBody
 from .world import ContactWorld
-from .integrators import simulate_verlet
+from .integrators import simulate_verlet, simulate_rk4
 
-__all__ = ["RigidBody", "RigidMeshBody", "ContactWorld", "simulate_verlet"]
+__all__ = ["RigidBody", "RigidMeshBody", "ContactWorld", "simulate_verlet", "simulate_rk4"]

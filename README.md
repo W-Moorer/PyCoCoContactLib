@@ -139,6 +139,9 @@ simulate_verlet(world, t_end=2.0, dt_frame=0.01, dt_sub=1e-3, on_frame=on_frame)
   - 通过参数 `--name` 自定义 `<name>` 前缀，默认 `output`。
   - 目录内包含：`<out>.csv`、日志 `<log>.log`、各类绘图 PNG 与 `perf_metrics.csv`（性能摘要）。
 - 性能记录：内置轻量记录器会统计关键模块总耗时、次数与占比并写出 `perf_metrics.csv`，字段包括 `key,total_sec,count,avg_ms,percent,algorithm,t_end,dt_frame,dt_sub,bodies`。
+ - 性能记录：内置轻量记录器统计“排除嵌套”的模块耗时（exclusive）并写出 `perf_metrics.csv`：
+   - 字段：`key,exclusive_sec,inclusive_sec,count,avg_ms,exclusive_percent,algorithm,t_end,dt_frame,dt_sub,bodies`
+   - 最后一行 `TOTAL` 给出总耗时（用于图例标题展示），不参与饼图占比计算。
 
 ### 性能占比饼图（后处理）
 - 脚本位置：`post/plot_perf_pie.py`
@@ -153,7 +156,7 @@ simulate_verlet(world, t_end=2.0, dt_frame=0.01, dt_sub=1e-3, on_frame=on_frame)
     ```
 - 绘图说明：
   - 标题采用 `perf_metrics.csv` 所在文件夹名；字体使用 `Times New Roman`。
-  - 饼图内部仅显示较大扇区的百分比；右侧图例列出模块名、百分比与耗时。
+  - 饼图内部仅显示较大扇区的百分比；右侧图例列出模块名、百分比与耗时，并在图例标题处显示总耗时（来自 CSV 的 `TOTAL` 行）。
 
 ## 框架更新摘要
 - 统一输出位置：由 `models/<mesh>/...` 改为仓库根 `outputs/`，路径格式 `outputs/<name>_<meshStem>_<时间>/`。

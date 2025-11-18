@@ -1,0 +1,10 @@
+key,total_sec,count,avg_ms,percent,algorithm,t_end,dt_frame,dt_sub,bodies
+bvh.find_collision,13.819243099,16000,0.863703,14.3335,verlet,8.0,0.01,0.001,2
+callback.on_frame,0.010418902,800,0.013024,0.0108,verlet,8.0,0.01,0.001,2
+callback.on_substep,0.203778000,8000,0.025472,0.2114,verlet,8.0,0.01,0.001,2
+detector.build_candidates,6.305954101,13879,0.454352,6.5406,verlet,8.0,0.01,0.001,2
+detector.project_prev,3.186745701,16000,0.199172,3.3053,verlet,8.0,0.01,0.001,2
+detector.query_manifold,23.868950900,16000,1.491809,24.7572,verlet,8.0,0.01,0.001,2
+detector.reduce_manifold,0.427318899,13879,0.030789,0.4432,verlet,8.0,0.01,0.001,2
+integrator.step_sub,24.484181899,8000,3.060523,25.3953,verlet,8.0,0.01,0.001,2
+world.compute_forces,24.105758007,16000,1.506610,25.0028,verlet,8.0,0.01,0.001,2

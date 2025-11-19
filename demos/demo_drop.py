@@ -8,6 +8,7 @@ import numpy as np
 import re
 
 from rcsim import RapidMesh, RigidMeshBody, ContactWorld, simulate_verlet, simulate_rk4
+from rcsim.io.perf import perf
 try:
     import matplotlib.pyplot as plt
 except Exception:
@@ -126,6 +127,11 @@ def run_case(mesh: str, t_end: float, dt_frame: float, dt_sub: float, damp: floa
     f.write(f"energy_rel_error=0.000000e+00\n")
     f.flush()
     f.close()
+    try:
+        perf_path = os.path.join(os.path.dirname(csv_path), 'perf_metrics.csv')
+        perf.write_csv(perf_path)
+    except Exception:
+        pass
 
 
 def plot_results(csv_path: str, log_path: str, out_dir: str) -> None:
@@ -362,15 +368,18 @@ def main():
     parser.add_argument('--video', action='store_true')
     parser.add_argument('--fps', type=int, default=30)
     parser.add_argument('--stride', type=int, default=1)
+    parser.add_argument('--name', type=str, default='output')
     args = parser.parse_args()
 
     mesh_basename = os.path.basename(args.mesh)
     mesh_stem = os.path.splitext(mesh_basename)[0]
-    mesh_dir = os.path.dirname(os.path.abspath(args.mesh))
-    out_dir = os.path.join(mesh_dir, mesh_stem)
-    os.makedirs(out_dir, exist_ok=True)
-    ts_name = time.strftime('viz_%Y%m%d_%H%M%S')
-    viz_dir = os.path.join(out_dir, ts_name)
+    base_out = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+    base_out = os.path.abspath(base_out)
+    outputs_root = os.path.join(base_out, 'outputs')
+    os.makedirs(outputs_root, exist_ok=True)
+    ts_name = time.strftime('%Y%m%d_%H%M%S')
+    name = getattr(args, 'name', 'output')
+    viz_dir = os.path.join(outputs_root, f"{name}_{mesh_stem}_{ts_name}")
     os.makedirs(viz_dir, exist_ok=True)
     csv_path = os.path.join(viz_dir, os.path.basename(args.out))
     log_path = os.path.join(viz_dir, os.path.basename(args.log))

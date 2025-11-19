@@ -9,6 +9,7 @@ from .tri_geom import (
     TriangleDistance2,
     triTriIntersect,
 )
+from rcsim.io.perf import perf
 
 
 class MeshPairContactDetector:
@@ -198,12 +199,16 @@ class MeshPairContactDetector:
         max_points: int = 4,
     ) -> ContactManifold:
         pairs: List[Tuple[int, int]] = []
-        self.meshA.bvh.find_collision(self.meshB.bvh, poseA, poseB, pairs)
-        projected = self._project_prev_manifold(poseA, poseB, prev_manifold)
+        with perf.section("bvh.find_collision"):
+            self.meshA.bvh.find_collision(self.meshB.bvh, poseA, poseB, pairs)
+        with perf.section("detector.project_prev"):
+            projected = self._project_prev_manifold(poseA, poseB, prev_manifold)
         if not pairs and not projected:
             return ContactManifold()
-        candidates = projected + self._build_candidates_from_pairs(poseA, poseB, pairs)
-        manifold = self._reduce_candidates_to_manifold(candidates, max_points=max_points)
+        with perf.section("detector.build_candidates"):
+            candidates = projected + self._build_candidates_from_pairs(poseA, poseB, pairs)
+        with perf.section("detector.reduce_manifold"):
+            manifold = self._reduce_candidates_to_manifold(candidates, max_points=max_points)
         return manifold
 
     def closest(self, poseA: Tuple[np.ndarray, np.ndarray], poseB: Tuple[np.ndarray, np.ndarray]) -> Tuple[float, np.ndarray]:

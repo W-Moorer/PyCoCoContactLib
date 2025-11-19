@@ -2,12 +2,17 @@ import numpy as np
 from typing import Callable, Optional
 
 from rcsim.physics.world import ContactWorld
+from rcsim.io.perf import perf
 
 
 def step_sub(world: ContactWorld, dt: float) -> None:
     n = len(world.bodies)
     x0 = np.stack([rb.body.position.copy() for rb in world.bodies], axis=0)
     v0 = np.stack([rb.body.velocity.copy() for rb in world.bodies], axis=0)
+    masses = np.array([rb.body.mass for rb in world.bodies], dtype=float).reshape(n)
+    static_mask = np.array([rb.body.is_static for rb in world.bodies], dtype=bool).reshape(n)
+    inv_m = np.zeros(n, dtype=float)
+    inv_m[(~static_mask) & (masses > 0.0)] = 1.0 / masses[(~static_mask) & (masses > 0.0)]
 
     def set_state(X: np.ndarray, V: np.ndarray) -> None:
         for i, rb in enumerate(world.bodies):
@@ -20,10 +25,6 @@ def step_sub(world: ContactWorld, dt: float) -> None:
     def compute_a(X: np.ndarray, V: np.ndarray) -> np.ndarray:
         set_state(X, V)
         F = world.compute_forces()
-        masses = np.array([rb.body.mass for rb in world.bodies], dtype=float).reshape(n)
-        static_mask = np.array([rb.body.is_static for rb in world.bodies], dtype=bool).reshape(n)
-        inv_m = np.zeros(n, dtype=float)
-        inv_m[(~static_mask) & (masses > 0.0)] = 1.0 / masses[(~static_mask) & (masses > 0.0)]
         a = F * inv_m[:, None]
         return a
 
@@ -67,14 +68,21 @@ def simulate(
     t = 0.0
     frame = 0
     while t < t_end - 1e-12:
+        try:
+            perf.set_meta(algorithm="rk4", t_end=t_end, dt_frame=dt_frame, dt_sub=dt_sub, bodies=len(world.bodies))
+        except Exception:
+            pass
         remaining = dt_frame
         while remaining > 1e-12:
             dt = min(dt_sub, remaining)
-            step_sub(world, dt)
+            with perf.section("integrator.step_sub"):
+                step_sub(world, dt)
             remaining -= dt
             t += dt
             if on_substep is not None:
-                on_substep(t, world)
+                with perf.section("callback.on_substep"):
+                    on_substep(t, world)
         if on_frame is not None:
-            on_frame(frame, t, world)
+            with perf.section("callback.on_frame"):
+                on_frame(frame, t, world)
         frame += 1

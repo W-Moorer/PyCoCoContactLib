@@ -1,0 +1,7 @@
+key,exclusive_sec,inclusive_sec,count,avg_ms,exclusive_percent,algorithm,t_end,dt_frame,dt_sub,bodies
+callback.on_frame,0.014004200,0.014004200,800,0.017505,0.0010,genalpha,8.0,0.01,0.001,2
+callback.on_substep,2.210079403,2.210079403,8524,0.259277,0.1606,genalpha,8.0,0.01,0.001,2
+detector.query_manifold,1371.366525197,1371.366525197,37292,36.773746,99.6696,genalpha,8.0,0.01,0.001,2
+integrator.step_sub,1.408067711,1369.596304601,10406,0.135313,0.1023,genalpha,8.0,0.01,0.001,2
+world.compute_forces,0.914195394,1372.280720591,37280,0.024522,0.0664,genalpha,8.0,0.01,0.001,2
+TOTAL,1375.912871905,4115.467633993,,,100.00,genalpha,8.0,0.01,0.001,2

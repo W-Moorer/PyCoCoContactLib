@@ -187,14 +187,7 @@ def run_case(
             dt_frame=dt_frame,
             dt_sub=dt_sub,
             on_substep=on_sub,
-            use_performance_optimization=True,
-            contact_dt_cap=ga_cap,
             min_dt=ga_min_dt,
-            contact_growth_thr=ga_growth_thr,
-            growth_scale=ga_growth_scale,
-            init_thr_scale=ga_init_scale,
-            init_thr_max=ga_init_max,
-            contact_grace_steps=ga_grace,
             rho_inf=ga_rho_inf,  # 关键修复：传递rho_inf参数
             max_iter=ga_iter,    # 关键修复：传递max_iter参数
             tol=ga_tol           # 关键修复：传递tol参数

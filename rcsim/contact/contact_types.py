@@ -11,21 +11,24 @@ EILON_2 = 1e-10
 
 
 class ContactType(IntEnum):
-    separate = 0
-    unknownContact = 1
-    Intersect2d = 2
-    Overlap2d = 3
-    pointToSurface = 4
-    edgeToSurface = 5
-    edgeToEdge = 6
-    surfaceToSurface = 7
-    sphereToSphere = 8
-    sphereToPlane = 9
-    sphereToCuboid = 10
-    sphereToCylinder = 11
-    cuboidToCuboid = 12
-    cylinderToPlane = 13
-    rbfTorbf = 14
+    SEPARATE = 0
+    UNKNOWN = 1
+    INTERSECT_2D = 2
+    OVERLAP_2D = 3
+    POINT_TO_SURFACE = 4
+    EDGE_TO_SURFACE = 5
+    EDGE_TO_EDGE = 6
+    SURFACE_TO_SURFACE = 7
+    SPHERE_TO_SPHERE = 8
+    SPHERE_TO_PLANE = 9
+    SPHERE_TO_CUBOID = 10
+    SPHERE_TO_CYLINDER = 11
+    CUBOID_TO_CUBOID = 12
+    CYLINDER_TO_PLANE = 13
+    RBF_TO_RBF = 14
+    TRIANGLE_TO_TRIANGLE = 15
+    TRIANGLE_TO_SPHERE = 16
+    TRIANGLE_TO_PLANE = 17
 
 
 @dataclass
@@ -38,7 +41,7 @@ class CollisionResult:
     rejectPntsOutTri: bool = True
     peneAngleThres: float = math.pi / 4.0
     surfaceSurfaceAngleThres: float = 9.0 * math.pi / 10.0
-    contactResult: ContactType = ContactType.unknownContact
+    contactResult: ContactType = ContactType.UNKNOWN
     contPtsPairs: List[Tuple[np.ndarray, np.ndarray]] = field(default_factory=list)
     closetPtsPairs: List[Tuple[np.ndarray, np.ndarray]] = field(default_factory=list)
     contactNormal: np.ndarray = field(default_factory=lambda: np.zeros(3))

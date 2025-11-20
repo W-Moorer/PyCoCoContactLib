@@ -7,7 +7,8 @@ import time
 import numpy as np
 import re
 
-from rcsim import RapidMesh, RigidMeshBody, ContactWorld, simulate_verlet, simulate_rk4
+from rcsim import RapidMesh, RigidMeshBody, ContactWorld, simulate_verlet, simulate_rk4, simulate_generalized_alpha
+from demos.optimized_generalized_alpha import optimized_simulate
 from rcsim.io.perf import perf
 try:
     import matplotlib.pyplot as plt
@@ -15,12 +16,47 @@ except Exception:
     plt = None
 
 
-def run_case(mesh: str, t_end: float, dt_frame: float, dt_sub: float, damp: float, log_path: str, csv_path: str, progress: float | None, verbose: bool, half_wave: bool, integrator: str = "verlet"):
+def run_case(
+    mesh: str,
+    t_end: float,
+    dt_frame: float,
+    dt_sub: float,
+    damp: float,
+    log_path: str,
+    csv_path: str,
+    progress: float | None,
+    verbose: bool,
+    half_wave: bool,
+    integrator: str = "verlet",
+    ga_rho_inf: float = 0.5,
+    ga_tol: float = 1e-8,
+    ga_iter: int = 20,
+    ga_relax: float = 1.0,
+    ga_newton: bool = False,
+    ga_eps_x: float = 1e-6,
+    ga_eps_v: float = 1e-6,
+    ga_cap: float = 1.0e-3,
+    ga_min_dt: float = 1.0e-6,
+    ga_growth_thr: float = 1.0e-3,
+    ga_growth_scale: float = 0.1,
+    ga_init_scale: float = 1.0,
+    ga_init_max: float = 5.0e-3,
+    ga_grace: int = 1,
+):
     meshA = RapidMesh.from_obj(mesh)
     meshB = RapidMesh.from_obj(mesh)
     A = RigidMeshBody(meshA, 1.0, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], is_static=True)
     B = RigidMeshBody(meshB, 1.0, [0.0, 0.0, 205.0], [0.0, 0.0, 0.0], is_static=False)
-    world = ContactWorld([A, B], g=-9.8, k_contact=1e5, c_damp=damp, half_wave_damp=half_wave)
+    world = ContactWorld(
+        [A, B],
+        g=-9.8,
+        k_contact=1e5,
+        c_damp=damp,
+        half_wave_damp=half_wave,
+        damp_type="linear",
+        exponent=1.0,
+        rebound_factor=0.0,  # 关闭反弹因子，实现纯弹性碰撞
+    )
     world.build_all_pairs()
 
     records: list[tuple[float, ...]] = []
@@ -29,6 +65,8 @@ def run_case(mesh: str, t_end: float, dt_frame: float, dt_sub: float, damp: floa
     last_fn = 0.0
     last_fn_raw = 0.0
     last_speed = 0.0
+    last_ts = 0.0
+    E0 = None
 
     f = open(log_path, 'w', encoding='utf-8')
     steps = int(math.ceil(t_end / dt_frame))
@@ -38,7 +76,22 @@ def run_case(mesh: str, t_end: float, dt_frame: float, dt_sub: float, damp: floa
         f.flush()
 
     def on_sub(ts: float, w: ContactWorld):
-        nonlocal contact_count, last_pen, last_fn, last_fn_raw, last_speed
+        nonlocal contact_count, last_pen, last_fn, last_fn_raw, last_speed, last_ts, E0
+        def calc_energy() -> float:
+            E = 0.0
+            for rb in w.bodies:
+                b = rb.body
+                if not b.is_static and b.mass > 0.0:
+                    v2 = float(np.dot(b.velocity, b.velocity))
+                    E += 0.5 * b.mass * v2
+                    E += (-b.mass * w.g) * b.position[2]
+            pen_sum = 0.0
+            for pair in w.pairs:
+                for cp in pair.manifold.points:
+                    if cp.phi < 0.0:
+                        pen_sum += 0.5 * w.k_contact * ((-cp.phi) ** 2) * cp.area_weight
+            E += pen_sum
+            return float(E)
         pair = w.pairs[0]
         pen = 0.0
         Fn = 0.0
@@ -62,13 +115,18 @@ def run_case(mesh: str, t_end: float, dt_frame: float, dt_sub: float, damp: floa
         if pen > 0.0:
             contact_count += 1
         if verbose:
+            dt_act = ts - last_ts
+            E = calc_energy()
+            if E0 is None:
+                E0 = float(E)
             f.write(
                 f"sub t={ts:.6f} z={w.bodies[1].body.position[2]:.6f} "
                 f"pen={last_pen:.6e} Fn={last_fn:.6f} "
                 f"Fn_raw={last_fn_raw:.6f} speed={last_speed:.6f} "
-                f"contacts={contact_count} dt={min(dt_sub, dt_frame):.6e} E=0\n"
+                f"contacts={contact_count} dt={dt_act:.6e} E={E:.6f}\n"
             )
             f.flush()
+        last_ts = ts
 
     next_prog = 0.0 if progress is None else float(progress)
 
@@ -96,8 +154,51 @@ def run_case(mesh: str, t_end: float, dt_frame: float, dt_sub: float, damp: floa
             if progress is not None:
                 next_prog += float(progress)
 
-    if integrator.lower() == "rk4":
+    integ = integrator.lower()
+    if integ == "rk4":
         simulate_rk4(world, t_end=t_end, dt_frame=dt_frame, dt_sub=dt_sub, on_frame=on_frame, on_substep=on_sub)
+    elif integ == "genalpha" or integ == "generalized_alpha":
+        simulate_generalized_alpha(
+            world,
+            t_end=t_end,
+            dt_frame=dt_frame,
+            dt_sub=dt_sub,
+            on_frame=on_frame,
+            on_substep=on_sub,
+            rho_inf=ga_rho_inf,
+            tol=ga_tol,
+            max_iter=ga_iter,
+            relax=ga_relax,
+            use_newton=ga_newton,
+            diff_eps_x=ga_eps_x,
+            diff_eps_v=ga_eps_v,
+            contact_dt_cap=ga_cap,
+            min_dt=ga_min_dt,
+            contact_growth_thr=ga_growth_thr,
+            growth_scale=ga_growth_scale,
+            init_thr_scale=ga_init_scale,
+            init_thr_max=ga_init_max,
+            contact_grace_steps=ga_grace,
+        )
+    elif integ == "optimized_genalpha" or integ == "optimized_generalized_alpha":
+        optimized_simulate(
+            world,
+            t_end=t_end,
+            dt_frame=dt_frame,
+            dt_sub=dt_sub,
+            on_substep=on_sub,
+            use_performance_optimization=True,
+            contact_dt_cap=ga_cap,
+            min_dt=ga_min_dt,
+            contact_growth_thr=ga_growth_thr,
+            growth_scale=ga_growth_scale,
+            init_thr_scale=ga_init_scale,
+            init_thr_max=ga_init_max,
+            contact_grace_steps=ga_grace,
+            rho_inf=ga_rho_inf,  # 关键修复：传递rho_inf参数
+            max_iter=ga_iter,    # 关键修复：传递max_iter参数
+            tol=ga_tol           # 关键修复：传递tol参数
+        )
     else:
         simulate_verlet(world, t_end=t_end, dt_frame=dt_frame, dt_sub=dt_sub, on_frame=on_frame, on_substep=on_sub)
 
@@ -124,7 +225,24 @@ def run_case(mesh: str, t_end: float, dt_frame: float, dt_sub: float, damp: floa
         f"final_distance={float(np.linalg.norm(world.bodies[1].body.position - world.bodies[0].body.position)):.6f}\n"
     )
     f.write(f"contacts={contact_count}\n")
-    f.write(f"energy_rel_error=0.000000e+00\n")
+    try:
+        E_end = 0.0
+        for rb in world.bodies:
+            b = rb.body
+            if not b.is_static and b.mass > 0.0:
+                v2 = float(np.dot(b.velocity, b.velocity))
+                E_end += 0.5 * b.mass * v2
+                E_end += (-b.mass * world.g) * b.position[2]
+        pen_sum = 0.0
+        for pair in world.pairs:
+            for cp in pair.manifold.points:
+                if cp.phi < 0.0:
+                    pen_sum += 0.5 * world.k_contact * ((-cp.phi) ** 2) * cp.area_weight
+        E_end += pen_sum
+        rel = 0.0 if (E0 is None or abs(E0) < 1e-12) else abs((E_end - E0) / E0)
+        f.write(f"energy_rel_error={rel:.6e}\n")
+    except Exception:
+        f.write(f"energy_rel_error=nan\n")
     f.flush()
     f.close()
     try:
@@ -363,7 +481,21 @@ def main():
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--damp', type=float, default=0.0)
     parser.add_argument('--half_wave', action='store_true')
-    parser.add_argument('--integrator', type=str, choices=['verlet', 'rk4'], default='verlet')
+    parser.add_argument('--integrator', type=str, choices=['verlet', 'rk4', 'genalpha', 'generalized_alpha', 'optimized_genalpha', 'optimized_generalized_alpha'], default='verlet')
+    parser.add_argument('--rho_inf', type=float, default=0.5)
+    parser.add_argument('--ga_tol', type=float, default=1e-8)
+    parser.add_argument('--ga_iter', type=int, default=20)
+    parser.add_argument('--ga_relax', type=float, default=1.0)
+    parser.add_argument('--ga_newton', action='store_true')
+    parser.add_argument('--ga_eps_x', type=float, default=1e-6)
+    parser.add_argument('--ga_eps_v', type=float, default=1e-6)
+    parser.add_argument('--ga_cap', type=float, default=1.0e-3)
+    parser.add_argument('--ga_min_dt', type=float, default=1.0e-6)
+    parser.add_argument('--ga_growth_thr', type=float, default=1.0e-3)
+    parser.add_argument('--ga_growth_scale', type=float, default=0.1)
+    parser.add_argument('--ga_init_scale', type=float, default=1.0)
+    parser.add_argument('--ga_init_max', type=float, default=5.0e-3)
+    parser.add_argument('--ga_grace', type=int, default=1)
     parser.add_argument('--plot', action='store_true')
     parser.add_argument('--video', action='store_true')
     parser.add_argument('--fps', type=int, default=30)
@@ -396,6 +528,20 @@ def main():
         verbose=args.verbose,
         half_wave=args.half_wave,
         integrator=args.integrator,
+        ga_rho_inf=args.rho_inf,
+        ga_tol=args.ga_tol,
+        ga_iter=args.ga_iter,
+        ga_relax=args.ga_relax,
+        ga_newton=args.ga_newton,
+        ga_eps_x=args.ga_eps_x,
+        ga_eps_v=args.ga_eps_v,
+        ga_cap=args.ga_cap,
+        ga_min_dt=args.ga_min_dt,
+        ga_growth_thr=args.ga_growth_thr,
+        ga_growth_scale=args.ga_growth_scale,
+        ga_init_scale=args.ga_init_scale,
+        ga_init_max=args.ga_init_max,
+        ga_grace=args.ga_grace,
     )
     # Always export per-body pos/vel/acc component PNGs
     try:

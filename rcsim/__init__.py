@@ -18,6 +18,7 @@ from .physics import (
     ContactWorld,
     simulate_verlet,
     simulate_rk4,
+    simulate_generalized_alpha,
 )
 from .io import csv_recorder
 
@@ -26,6 +27,6 @@ __all__ = [
     "Aabb", "AabbWithData", "BvhTree",
     "ContactType", "CollisionResult", "ContactPoint", "ContactManifold",
     "MeshPairContactDetector", "RapidContactDetectionLib",
-    "RigidBody", "RigidMeshBody", "ContactWorld", "simulate_verlet", "simulate_rk4",
+    "RigidBody", "RigidMeshBody", "ContactWorld", "simulate_verlet", "simulate_rk4", "simulate_generalized_alpha",
     "csv_recorder",
 ]
